@@ -107,9 +107,7 @@ static ContactManager *_manager = nil;
     [self.store enumerateContactsWithFetchRequest:fetchRequest error:nil usingBlock:^(CNContact *contact, BOOL *stop) {
         
         NSString *fulName = [NSString stringWithFormat:@"%@%@%@",contact.familyName,contact.middleName,contact.givenName];
-        
-//        if ([fulName isEqualToString:name]) {
-            
+                
             ContactModel *contactModel = [[ContactModel alloc] init];
             contactModel.name = fulName;
             contactModel.nickname = contact.nickname;
