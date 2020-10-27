@@ -8,7 +8,6 @@
 
 #import <Foundation/Foundation.h>
 #import <Contacts/Contacts.h>
-#import <AddressBook/AddressBook.h>
 #import "ContactModel.h"
 
 NS_ASSUME_NONNULL_BEGIN
@@ -21,7 +20,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 -(void)requestContactStatusWithCompletionHandler:(void(^)(BOOL granted,CNAuthorizationStatus status))handler;
 
--(void)getTelWithName:(NSString *)name completeblock:(void(^)(ContactModel *model))completeBlock;
+-(void)getTelWithName:(NSString *)name completeblock:(void(^)(NSArray <ContactModel *> *contactModels))completeBlock;
 
 -(void)getTelWithSubTel:(NSString *)subTel completeBlock:(void(^)(NSArray <ContactModel *> *contactModels))completeBlock;
 

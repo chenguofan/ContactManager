@@ -8,7 +8,7 @@
 
 #import "ContactManager.h"
 #import <Contacts/Contacts.h>
-#import <AddressBook/AddressBook.h>
+#import "NSString+Add.h"
 
 @interface ContactManager ()
 @property (nonatomic, strong) CNContactStore *store;
@@ -40,7 +40,6 @@ static ContactManager *_manager = nil;
     return status;
 }
 
-
 -(void)requestContactStatusWithCompletionHandler:(void(^)(BOOL granted,CNAuthorizationStatus status))handler{
     [self.store requestAccessForEntityType:CNEntityTypeContacts completionHandler:^(BOOL granted, NSError * _Nullable error) {
         if (error) {
@@ -56,43 +55,73 @@ static ContactManager *_manager = nil;
     
 }
 
--(void)getTelWithName:(NSString *)name completeblock:(void(^)(ContactModel *model))completeBlock{
+-(void)getTelWithName:(NSString *)name completeblock:(void(^)(NSArray <ContactModel *> *contactModels))completeBlock{
+    
     NSArray *fetchKeys = @[[CNContactFormatter descriptorForRequiredKeysForStyle:CNContactFormatterStyleFullName],
                            CNContactPhoneNumbersKey];
     
     CNContactFetchRequest *fetchRequest = [[CNContactFetchRequest alloc] initWithKeysToFetch:fetchKeys];
+    NSMutableArray *arrM = [NSMutableArray array];
     
-    [self.store enumerateContactsWithFetchRequest:fetchRequest error:nil usingBlock:^(CNContact *contact, BOOL *stop) {
+    [self.store enumerateContactsWithFetchRequest:fetchRequest error:nil usingBlock:^(CNContact *contact, BOOL *stop)
+    {
+        //全名比较
+            NSString *fulName = [NSString stringWithFormat:@"%@%@%@",contact.familyName,contact.middleName,contact.givenName];
+            NSString *pinyin_fullName = [[NSString translateChineseToPinYin:fulName] stringByReplacingOccurrencesOfString:@" " withString:@""];
+            NSString *pinyin_name = [[NSString translateChineseToPinYin:name]stringByReplacingOccurrencesOfString:@" " withString:@""];
+              
+        NSLog(@"pinyin_fullName == %@",pinyin_fullName);
+        NSLog(@"pinyin_name == %@",pinyin_name);
         
-        NSString *fulName = [NSString stringWithFormat:@"%@%@%@",contact.familyName,contact.middleName,contact.givenName];
+        float likePercent = [NSString likePercent:pinyin_fullName OrString:pinyin_name];
+        NSLog(@"likePercent == %f",likePercent);
         
-        if ([fulName isEqualToString:name]) {
-            
-            ContactModel *contactModel = [[ContactModel alloc] init];
-            contactModel.name = fulName;
-            contactModel.nickname = contact.nickname;
-            contactModel.namePrefix = contactModel.namePrefix;
-            contactModel.nameSuffix = contactModel.nameSuffix;
-            
+        if ([pinyin_fullName isEqualToString:pinyin_name]) {
+            ContactModel *contactModel = [[ContactModel alloc] initWithContact:contact];
             NSMutableArray *telNumbers = [[NSMutableArray alloc] init];
             if (contact.phoneNumbers.count>0) {
                 for (CNLabeledValue *cnLabe in contact.phoneNumbers) {
                     
                     CNPhoneNumber *cnNumber = cnLabe.value;
-                    NSString *telPhoneNumber = cnNumber.stringValue;
+                    NSString *telPhoneNumber = [cnNumber.stringValue stringByReplacingOccurrencesOfString:@" " withString:@""];
+                    telPhoneNumber = [telPhoneNumber stringByReplacingOccurrencesOfString:@"-" withString:@""];
+                    telPhoneNumber = [telPhoneNumber stringByReplacingOccurrencesOfString:@"+86" withString:@""];
                     [telNumbers addObject:telPhoneNumber];
-                    
                 }
             }
-            
             contactModel.phoneNumbers = telNumbers;
-            *stop = YES;
+            [arrM addObject:contactModel];
             
-            if (completeBlock) {
-                completeBlock(contactModel);
+        }else{
+            if (likePercent > 85)
+            {
+                ContactModel *contactModel = [[ContactModel alloc] initWithContact:contact];
+                NSMutableArray *telNumbers = [[NSMutableArray alloc] init];
+                if (contact.phoneNumbers.count>0)
+                {
+                    for (CNLabeledValue *cnLabe in contact.phoneNumbers)
+                    {
+                
+                        CNPhoneNumber *cnNumber = cnLabe.value;
+                        NSString *telPhoneNumber = [cnNumber.stringValue stringByReplacingOccurrencesOfString:@" " withString:@""];
+                        telPhoneNumber = [telPhoneNumber stringByReplacingOccurrencesOfString:@"-" withString:@""];
+                        telPhoneNumber = [telPhoneNumber stringByReplacingOccurrencesOfString:@"+86" withString:@""];
+                        [telNumbers addObject:telPhoneNumber];
+                    }
+                }
+                contactModel.phoneNumbers = telNumbers;
+                [arrM addObject:contactModel];
             }
         }
+        
     }];
+    
+    NSLog(@"arrM == %@",arrM);
+    
+    if (completeBlock){
+        completeBlock(arrM);
+    }
+    
 }
 
 //模糊查找电话
@@ -107,20 +136,17 @@ static ContactManager *_manager = nil;
     [self.store enumerateContactsWithFetchRequest:fetchRequest error:nil usingBlock:^(CNContact *contact, BOOL *stop) {
         
         NSString *fulName = [NSString stringWithFormat:@"%@%@%@",contact.familyName,contact.middleName,contact.givenName];
-                
-            ContactModel *contactModel = [[ContactModel alloc] init];
-            contactModel.name = fulName;
-            contactModel.nickname = contact.nickname;
-            contactModel.namePrefix = contactModel.namePrefix;
-            contactModel.nameSuffix = contactModel.nameSuffix;
-            
+        
+        ContactModel *contactModel = [[ContactModel alloc] initWithContact:contact];
+        
             NSMutableArray *telNumbers = [[NSMutableArray alloc] init];
             if (contact.phoneNumbers.count>0) {
                 for (CNLabeledValue *cnLabe in contact.phoneNumbers) {
-                    
                     CNPhoneNumber *cnNumber = cnLabe.value;
-                    NSString *telPhoneNumber = cnNumber.stringValue;
-                  
+                    NSString *telPhoneNumber = [cnNumber.stringValue stringByReplacingOccurrencesOfString:@" " withString:@""];
+                    telPhoneNumber = [telPhoneNumber stringByReplacingOccurrencesOfString:@"-" withString:@""];
+                    telPhoneNumber = [telPhoneNumber stringByReplacingOccurrencesOfString:@"+86" withString:@""];
+                    
                     if ([telPhoneNumber containsString:subTel]) {
                         [telNumbers addObject:telPhoneNumber];
                         contactModel.phoneNumbers = telNumbers;
@@ -129,6 +155,8 @@ static ContactManager *_manager = nil;
                 }
             }
     }];
+    
+    NSLog(@"arrM == %@",arrM);
     
     if (completeBlock) {
         completeBlock(arrM);
